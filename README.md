@@ -1,2 +1,39 @@
-# srp.cr
-This is a pure Crystal implementation of the Secure Remote Password protocol. With this, a server can validate a secret from a client, such as a password, without ever seeing the secret. The secret itself is never sent over the wire, and the server never stores anything that can be decrypted back into the secret.
+# srp
+
+TODO: Write a description here
+
+## Installation
+
+1. Add the dependency to your `shard.yml`:
+
+   ```yaml
+   dependencies:
+     srp:
+       github: your-github-user/srp
+   ```
+
+2. Run `shards install`
+
+## Usage
+
+```crystal
+require "srp"
+```
+
+TODO: Write usage instructions here
+
+## Development
+
+TODO: Write development instructions here
+
+## Contributing
+
+1. Fork it (<https://github.com/your-github-user/srp/fork>)
+2. Create your feature branch (`git checkout -b my-new-feature`)
+3. Commit your changes (`git commit -am 'Add some feature'`)
+4. Push to the branch (`git push origin my-new-feature`)
+5. Create a new Pull Request
+
+## Contributors
+
+- [Kirk Haines](https://github.com/your-github-user) - creator and maintainer
