@@ -178,11 +178,11 @@ module Srp
     # The `parameters_for_group()` method returns the parameters for the
     # given *group*. The parameters are returned as a tuple in the form of:
     #
-    # `{N, g, HashProvider}`
+    # `{prime_modulus, generator, hash_algorithm}`
     #
-    # Where N is a BigInt representing a safe prime of *group* bits, g is an
-    # Int32 representing the generator and HashProvider is a the class to use
-    # for hashing operations.
+    # Where prime_modulus is a BigInt representing a safe prime of *group* bits,
+    # generator is an Int32 representing the group generator, and hash_algorithm
+    # is a String naming the hash algorithm to use (e.g., "SHA256").
     #
     # The values are taken from appendix A of [RFC 5054](https://datatracker.ietf.org/doc/html/rfc5054#appendix-A).
     #
@@ -213,11 +213,11 @@ module Srp
   # The `ng()` macro returns the parameters for the given *group*. These parameters
   # are returned as a tuple of:
   #
-  # `{N, g, HashProvider}`
+  # `{prime_modulus, generator, hash_algorithm}`
   #
-  # Where N is a BigInt representing a safe prime of *group* bits, g is an
-  # Int32 representing the generator and HashProvider is a the class to use
-  # for hashing operations.
+  # Where prime_modulus is a BigInt representing a safe prime of *group* bits,
+  # generator is an Int32 representing the group generator, and hash_algorithm
+  # is a String naming the hash algorithm to use (e.g., "SHA1" or "SHA256").
   #
   # The following *group* values, representing the number of bits in the safe prime, are supported:
   #

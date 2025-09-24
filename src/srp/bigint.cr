@@ -20,11 +20,11 @@ struct BigInt
   # This algorithm is optimized for large exponents.
   #
   # TODO: The actual implementation of the algorithm can likely be optimized.
-  def mod_exp(b, n)
+  def mod_exp(b, n) : BigInt
     base = 2 << 4 # 4 is (k - 1), where k is 5, which seems to give good general performance
     table = Array(BigInt).new(base + 1, 1.to_big_i)
     (1..base).each { |i| table[i] = table[i - 1] * self % n }
-    r = 1
+    r = 1.to_big_i
     digits_of_n(b, base).reverse.each do |digit|
       5.times { r = r * r % n } # k is 5
       r = r * table[digit] % n if digit > 0

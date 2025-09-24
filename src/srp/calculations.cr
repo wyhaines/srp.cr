@@ -1,3 +1,5 @@
+require "openssl"
+
 module Srp
   # The `Calculations` module encapsulates all of the shared convenience methods
   # and mathematical calculation methods that both the client and the server
@@ -16,19 +18,19 @@ module Srp
     end
 
     def calculate_sha(*args)
-      hasher = OpenSSL::Digest.new(@data.hash)
+      hasher = OpenSSL::Digest.new(@data.hash_algorithm)
       args.each {|arg| hasher << arg.to_s}
       hasher.hexfinal
     end
 
     def calculate_sha(&)
-      hasher = OpenSSL::Digest.new(@data.hash)
+      hasher = OpenSSL::Digest.new(@data.hash_algorithm)
       yield(hasher)
       hasher.hexfinal
     end
 
     def calculate_hash(*args)
-      length = 2 * ((@data.n_prime.to_s(16).size * 4 + 7) >> 3)
+      length = 2 * ((@data.prime_modulus.to_s(16).size * 4 + 7) >> 3)
 
       hash = calculate_sha do |hasher|
         args.each do |arg|
@@ -39,24 +41,19 @@ module Srp
         end
       end
 
-      BigInt.new(hash, 16) % @data.n_prime
+      BigInt.new(hash, 16) % @data.prime_modulus
     end
 
-    # Multiplier parameter
-    # k = H(N, g)   (in SRP-6a)
-    def calc_k(n, g, hash_class)
-      calculate_hash(n, g)
+    def calculate_multiplier_parameter(prime, generator, hash_class)
+      calculate_hash(prime, generator)
     end
 
-    # A = g^a (mod N)
-    def calc_cap_a(g, a, n)
-      BigInt.new(g).mod_exp(a, n)
+    def generate_client_public_key(generator, client_private, prime)
+      BigInt.new(generator).mod_exp(client_private, prime)
     end
 
-    # TODO: Rename this to something less cryptic. What is "x"?
-    # Private key (derived from username, raw password and salt)
-    # x = H(salt || H(username || ':' || password))
-    def calc_x(username, password, salt)
+    # H(salt || H(username || ':' || password))
+    def derive_password_hash(username, password, salt)
       calculate_sha do |hasher|
         hasher << (salt.size.odd? ? "0" : "")
         hasher << salt.to_s
@@ -64,10 +61,62 @@ module Srp
       end
     end
 
-    # Calculate verifier function
-    # v = g^x (mod N)
-    def calculate_verifier(x, n, g)
-      BigInt.new(g).mod_exp(x, n)
+    def generate_password_verifier(password_hash, prime, generator)
+      BigInt.new(generator).mod_exp(password_hash, prime)
+    end
+
+    def generate_server_public_key(multiplier, verifier, generator, server_private, prime)
+      (multiplier * verifier + BigInt.new(generator).mod_exp(server_private, prime)) % prime
+    end
+
+    def calculate_scrambling_parameter(client_public, server_public, prime)
+      calculate_hash(client_public, server_public)
+    end
+
+    # Calculate shared secret on client side
+    # The client removes the password verifier component from server's public key,
+    # then raises the result to a combined exponent based on their private key and password
+    # Mathematical formula: shared_secret = (server_public - multiplier * generator^password_hash) ^ (client_private + scrambler * password_hash) mod prime
+    def calculate_client_shared_secret(server_public, multiplier, generator, password_hash, client_private, scrambler, prime) : BigInt
+      # Remove password verifier component from server's public key
+      base = from_hex_string(server_public) - (multiplier * BigInt.new(generator).mod_exp(password_hash, prime))
+      base = base % prime
+      base = prime + base if base < 0
+
+      # Raise to combined exponent
+      exponent = client_private + scrambler * password_hash
+      base.mod_exp(exponent, prime)
+    end
+
+    # Calculate shared secret on server side
+    # The server combines client's public key with the password verifier raised to the scrambler,
+    # then raises the result to the server's private key
+    # Mathematical formula: shared_secret = (client_public * verifier^scrambler) ^ server_private mod prime
+    def calculate_server_shared_secret(client_public, verifier, scrambler, server_private, prime) : BigInt
+      # Combine client's public key with password verifier raised to scrambler
+      base = from_hex_string(client_public) * verifier.mod_exp(scrambler, prime)
+      (base % prime).mod_exp(server_private, prime)
+    end
+
+    def derive_session_key(shared_secret)
+      to_hex_string(BigInt.new(calculate_sha(to_hex_string(shared_secret)), 16))
+    end
+
+    # Generate client's proof of password knowledge
+    # This proves the client knows the password without sending it
+    # Combines hashed protocol parameters with session data for a unique proof
+    def generate_client_proof(prime, generator, username, salt, client_public, server_public, session_key)
+      # XOR the hashes of prime and generator for added security
+      prime_hash = BigInt.new(calculate_sha(to_hex_string(prime)), 16)
+      generator_hash = BigInt.new(calculate_sha(to_hex_string(BigInt.new(generator))), 16)
+      xor_hash = to_hex_string(prime_hash ^ generator_hash)
+      username_hash = calculate_sha(username)
+
+      calculate_sha(xor_hash, username_hash, salt, client_public, server_public, session_key)
+    end
+
+    def generate_server_proof(client_public, client_proof, session_key)
+      calculate_sha(client_public, client_proof, session_key)
     end
   end
 end
