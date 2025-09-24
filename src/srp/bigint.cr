@@ -2,6 +2,7 @@ require "big"
 
 struct BigInt
   # :nodoc:
+  @[AlwaysInline]
   private def digits_of_n(n, b)
     digits = Array(typeof(n)).new
     while n > 0
@@ -14,14 +15,14 @@ struct BigInt
   # Determines optimal window size based on exponent bit length
   # Smaller windows for small exponents (less table overhead)
   # Larger windows for large exponents (fewer multiplications)
-  private def optimal_window_size(exponent) : Int32
-    bits = exponent.bit_length
-    case bits
-    when 0..32     then 3  # Very small exponents
-    when 33..128   then 4  # Small exponents
-    when 129..512  then 5  # Medium exponents (typical SRP range)
-    when 513..2048 then 6  # Large exponents
-    else                7  # Very large exponents
+  @[AlwaysInline]
+  private def optimal_window_size_and_base(exponent) : Tuple(Int32, Int32)
+    case exponent.bit_length
+    when 0..32     then {3, 1 << 3}  # Very small exponents
+    when 33..128   then {4, 1 << 4}  # Small exponents
+    when 129..512  then {5, 1 << 5}  # Medium exponents (typical SRP range)
+    when 513..2048 then {6, 1 << 6}  # Large exponents
+    else                {7, 1 << 7}  # Very large exponents
     end
   end
 
@@ -33,12 +34,12 @@ struct BigInt
   #
   # This algorithm uses adaptive window sizing based on exponent size.
   def mod_exp(b, n) : BigInt
-    k = optimal_window_size(b)
-    base = 1 << k  # 2^k
+    k, base = optimal_window_size_and_base(b)
 
     # Improved table precomputation using doubling strategy
     # Reduces number of full multiplications needed
-    table = Array(BigInt).new(base + 1, 1.to_big_i)
+    table = StaticArray(BigInt, 129).new(1.to_big_i)
+    #table = Array(BigInt).new(base + 1, 1.to_big_i)
     table[1] = self % n
 
     if base > 1
